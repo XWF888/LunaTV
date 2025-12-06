@@ -12,7 +12,7 @@ interface ScrollableRowProps {
 function ScrollableRow({
   children,
   scrollDistance = 1000,
-  enableAnimation = true,
+  enableAnimation = false,
 }: ScrollableRowProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [showLeftScroll, setShowLeftScroll] = useState(false);
