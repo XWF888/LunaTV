@@ -154,7 +154,7 @@ function HomeClient() {
   };
 
   const [favoriteItems, setFavoriteItems] = useState<FavoriteItem[]>([]);
-  const [favoriteFilter, setFavoriteFilter] = useState<'all' | 'movie' | 'tv' | 'shortdrama' | 'live' | 'variety'>('all');
+  const [favoriteFilter, setFavoriteFilter] = useState<'all' | 'movie' | 'tv' | 'anime' | 'shortdrama' | 'live' | 'variety'>('all');
   const [favoriteSortBy, setFavoriteSortBy] = useState<'recent' | 'title' | 'rating'>('recent');
 
   useEffect(() => {
@@ -763,19 +763,27 @@ function HomeClient() {
                     // 优先用 type 字段判断
                     if (item.type) return item.type === 'movie';
                     // 向后兼容：没有 type 时用 episodes 判断
-                    return item.source !== 'shortdrama' &&
-                      item.source_name !== '短剧' &&
-                      item.origin === 'vod' &&
-                      item.episodes === 1;
+                    if (item.source === 'shortdrama' || item.source_name === '短剧') return false;
+                    if (item.source === 'bangumi') return false; // 排除动漫
+                    if (item.origin === 'live') return false; // 排除直播
+                    // vod 来源：按集数判断
+                    return item.episodes === 1;
                   }).length,
                   tv: favoriteItems.filter(item => {
                     // 优先用 type 字段判断
                     if (item.type) return item.type === 'tv';
                     // 向后兼容：没有 type 时用 episodes 判断
-                    return item.source !== 'shortdrama' &&
-                      item.source_name !== '短剧' &&
-                      item.origin === 'vod' &&
-                      item.episodes > 1;
+                    if (item.source === 'shortdrama' || item.source_name === '短剧') return false;
+                    if (item.source === 'bangumi') return false; // 排除动漫
+                    if (item.origin === 'live') return false; // 排除直播
+                    // vod 来源：按集数判断
+                    return item.episodes > 1;
+                  }).length,
+                  anime: favoriteItems.filter(item => {
+                    // 优先用 type 字段判断
+                    if (item.type) return item.type === 'anime';
+                    // 向后兼容：用 source 判断
+                    return item.source === 'bangumi';
                   }).length,
                   shortdrama: favoriteItems.filter(item => {
                     // 优先用 type 字段判断
@@ -806,8 +814,13 @@ function HomeClient() {
                         剧集 {stats.tv}
                       </span>
                     )}
-                    {stats.shortdrama > 0 && (
+                    {stats.anime > 0 && (
                       <span className='px-3 py-1 bg-pink-50 dark:bg-pink-900/20 text-pink-700 dark:text-pink-300 rounded-full'>
+                        动漫 {stats.anime}
+                      </span>
+                    )}
+                    {stats.shortdrama > 0 && (
+                      <span className='px-3 py-1 bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 rounded-full'>
                         短剧 {stats.shortdrama}
                       </span>
                     )}
@@ -832,6 +845,7 @@ function HomeClient() {
                     { key: 'all' as const, label: '全部', icon: '📚' },
                     { key: 'movie' as const, label: '电影', icon: '🎬' },
                     { key: 'tv' as const, label: '剧集', icon: '📺' },
+                    { key: 'anime' as const, label: '动漫', icon: '🎌' },
                     { key: 'shortdrama' as const, label: '短剧', icon: '🎭' },
                     { key: 'live' as const, label: '直播', icon: '📡' },
                     { key: 'variety' as const, label: '综艺', icon: '🎪' },
@@ -886,20 +900,29 @@ function HomeClient() {
                       // 优先用 type 字段判断
                       if (item.type) return item.type === 'movie';
                       // 向后兼容：没有 type 时用 episodes 判断
-                      return item.source !== 'shortdrama' &&
-                        item.source_name !== '短剧' &&
-                        item.origin === 'vod' &&
-                        item.episodes === 1;
+                      if (item.source === 'shortdrama' || item.source_name === '短剧') return false;
+                      if (item.source === 'bangumi') return false; // 排除动漫
+                      if (item.origin === 'live') return false; // 排除直播
+                      // vod 来源：按集数判断
+                      return item.episodes === 1;
                     });
                   } else if (favoriteFilter === 'tv') {
                     filtered = favoriteItems.filter(item => {
                       // 优先用 type 字段判断
                       if (item.type) return item.type === 'tv';
                       // 向后兼容：没有 type 时用 episodes 判断
-                      return item.source !== 'shortdrama' &&
-                        item.source_name !== '短剧' &&
-                        item.origin === 'vod' &&
-                        item.episodes > 1;
+                      if (item.source === 'shortdrama' || item.source_name === '短剧') return false;
+                      if (item.source === 'bangumi') return false; // 排除动漫
+                      if (item.origin === 'live') return false; // 排除直播
+                      // vod 来源：按集数判断
+                      return item.episodes > 1;
+                    });
+                  } else if (favoriteFilter === 'anime') {
+                    filtered = favoriteItems.filter(item => {
+                      // 优先用 type 字段判断
+                      if (item.type) return item.type === 'anime';
+                      // 向后兼容：用 source 判断
+                      return item.source === 'bangumi';
                     });
                   } else if (favoriteFilter === 'shortdrama') {
                     filtered = favoriteItems.filter(item => {
@@ -1207,7 +1230,7 @@ function HomeClient() {
                           douban_id={Number(show.id)}
                           rate={show.rate}
                           year={show.year}
-                          type='variety'
+                          type='tv'
                         />
                       </div>
                     ))}
