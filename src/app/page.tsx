@@ -759,11 +759,37 @@ function HomeClient() {
               {favoriteItems.length > 0 && (() => {
                 const stats = {
                   total: favoriteItems.length,
-                  movie: favoriteItems.filter(item => item.origin === 'vod' && item.episodes === 1 && item.type !== 'variety').length,
-                  tv: favoriteItems.filter(item => item.origin === 'vod' && item.episodes > 1 && item.type !== 'variety').length,
-                  shortdrama: favoriteItems.filter(item => item.origin === 'shortdrama' || item.source === 'shortdrama').length,
+                  movie: favoriteItems.filter(item => {
+                    // 优先用 type 字段判断
+                    if (item.type) return item.type === 'movie';
+                    // 向后兼容：没有 type 时用 episodes 判断
+                    return item.source !== 'shortdrama' &&
+                      item.source_name !== '短剧' &&
+                      item.origin === 'vod' &&
+                      item.episodes === 1;
+                  }).length,
+                  tv: favoriteItems.filter(item => {
+                    // 优先用 type 字段判断
+                    if (item.type) return item.type === 'tv';
+                    // 向后兼容：没有 type 时用 episodes 判断
+                    return item.source !== 'shortdrama' &&
+                      item.source_name !== '短剧' &&
+                      item.origin === 'vod' &&
+                      item.episodes > 1;
+                  }).length,
+                  shortdrama: favoriteItems.filter(item => {
+                    // 优先用 type 字段判断
+                    if (item.type) return item.type === 'shortdrama';
+                    // 向后兼容：用 source 判断
+                    return item.source === 'shortdrama' || item.source_name === '短剧';
+                  }).length,
                   live: favoriteItems.filter(item => item.origin === 'live').length,
-                  variety: favoriteItems.filter(item => item.type === 'variety').length,
+                  variety: favoriteItems.filter(item => {
+                    // 优先用 type 字段判断
+                    if (item.type) return item.type === 'variety';
+                    // 向后兼容：暂无 fallback
+                    return false;
+                  }).length,
                 };
                 return (
                   <div className='mb-4 flex flex-wrap gap-2 text-sm text-gray-600 dark:text-gray-400'>
@@ -856,15 +882,41 @@ function HomeClient() {
                   // 筛选
                   let filtered = favoriteItems;
                   if (favoriteFilter === 'movie') {
-                    filtered = favoriteItems.filter(item => item.origin === 'vod' && item.episodes === 1 && item.type !== 'variety');
+                    filtered = favoriteItems.filter(item => {
+                      // 优先用 type 字段判断
+                      if (item.type) return item.type === 'movie';
+                      // 向后兼容：没有 type 时用 episodes 判断
+                      return item.source !== 'shortdrama' &&
+                        item.source_name !== '短剧' &&
+                        item.origin === 'vod' &&
+                        item.episodes === 1;
+                    });
                   } else if (favoriteFilter === 'tv') {
-                    filtered = favoriteItems.filter(item => item.origin === 'vod' && item.episodes > 1 && item.type !== 'variety');
+                    filtered = favoriteItems.filter(item => {
+                      // 优先用 type 字段判断
+                      if (item.type) return item.type === 'tv';
+                      // 向后兼容：没有 type 时用 episodes 判断
+                      return item.source !== 'shortdrama' &&
+                        item.source_name !== '短剧' &&
+                        item.origin === 'vod' &&
+                        item.episodes > 1;
+                    });
                   } else if (favoriteFilter === 'shortdrama') {
-                    filtered = favoriteItems.filter(item => item.origin === 'shortdrama' || item.source === 'shortdrama');
+                    filtered = favoriteItems.filter(item => {
+                      // 优先用 type 字段判断
+                      if (item.type) return item.type === 'shortdrama';
+                      // 向后兼容：用 source 判断
+                      return item.source === 'shortdrama' || item.source_name === '短剧';
+                    });
                   } else if (favoriteFilter === 'live') {
                     filtered = favoriteItems.filter(item => item.origin === 'live');
                   } else if (favoriteFilter === 'variety') {
-                    filtered = favoriteItems.filter(item => item.type === 'variety');
+                    filtered = favoriteItems.filter(item => {
+                      // 优先用 type 字段判断
+                      if (item.type) return item.type === 'variety';
+                      // 向后兼容：暂无 fallback
+                      return false;
+                    });
                   }
 
                   // 排序
@@ -899,7 +951,6 @@ function HomeClient() {
                         query={item.search_title}
                         {...item}
                         from='favorite'
-                        type={item.episodes > 1 ? 'tv' : ''}
                         remarks={calculatedRemarks}
                       />
                     </div>
