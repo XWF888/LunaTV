@@ -406,6 +406,26 @@ export async function configSelfCheck(adminConfig: AdminConfig): Promise<AdminCo
     };
   }
 
+  // 确保网盘分享解析配置有默认值
+  if (!adminConfig.NetDiskShareConfig) {
+    adminConfig.NetDiskShareConfig = {
+      aliyundrive: {
+        enabled: false,
+        refreshToken: '',
+      },
+      pikpak: {
+        enabled: false,
+      },
+      pan123: {
+        enabled: false,
+      },
+      cloud115: {
+        enabled: false,
+        cookie: '',
+      },
+    };
+  }
+
   // 确保AI推荐配置有默认值
   if (!adminConfig.AIRecommendConfig) {
     adminConfig.AIRecommendConfig = {
