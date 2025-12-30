@@ -249,6 +249,40 @@ function PlayPageClient() {
     }
   }, [searchParams]);
 
+  // 重新加载触发器（用于触发 initAll 重新执行）
+  const [reloadTrigger, setReloadTrigger] = useState(0);
+  const reloadFlagRef = useRef<string | null>(null);
+
+  // 监听 URL source/id 参数变化（观影室切换源同步）
+  useEffect(() => {
+    const newSource = searchParams.get('source') || '';
+    const newId = searchParams.get('id') || '';
+    const newIndex = parseInt(searchParams.get('index') || '0');
+    const newTime = parseInt(searchParams.get('t') || '0');
+    const reloadFlag = searchParams.get('_reload');
+
+    // 如果 source 或 id 变化，且有 _reload 标记，且不是已经处理过的reload
+    if (reloadFlag && reloadFlag !== reloadFlagRef.current && (newSource !== currentSource || newId !== currentId)) {
+      console.log('[PlayPage] URL source/id changed with reload flag, reloading:', { newSource, newId, newIndex, newTime });
+
+      // 标记此reload已处理
+      reloadFlagRef.current = reloadFlag;
+
+      // 重置所有相关状态
+      setCurrentSource(newSource);
+      setCurrentId(newId);
+      setCurrentEpisodeIndex(newIndex);
+      setDetail(null);
+      setError(null);
+      setLoading(true);
+      setNeedPrefer(false);
+      setPlayerReady(false);
+
+      // 触发重新加载（通过更新 reloadTrigger 来触发 initAll 重新执行）
+      setReloadTrigger(prev => prev + 1);
+    }
+  }, [searchParams, currentSource, currentId]);
+
   // 换源相关状态
   const [availableSources, setAvailableSources] = useState<SearchResult[]>([]);
   const availableSourcesRef = useRef<SearchResult[]>([]);
@@ -623,6 +657,10 @@ function PlayPageClient() {
     pendingOwnerChange,
     confirmFollowOwner,
     rejectFollowOwner,
+    showSourceSwitchDialog,
+    pendingOwnerState,
+    handleConfirmSourceSwitch,
+    handleCancelSourceSwitch,
   } = useWatchRoomSync({
     watchRoom,
     artPlayerRef,
@@ -631,8 +669,9 @@ function PlayPageClient() {
     playerReady,
     videoId: currentId,  // 传入URL参数的id
     currentSource: currentSource,  // 传入当前播放源
-    videoTitle: detail?.title || '',  // 传入视频标题
-    videoYear: detail?.year || '',  // 传入视频年份
+    videoTitle: videoTitle,  // 传入视频标题（来自 state，初始值来自 URL）
+    videoYear: videoYear,  // 传入视频年份（来自 state，初始值来自 URL）
+    videoDoubanId: videoDoubanId,  // 传入豆瓣ID
     searchTitle: searchTitle,  // 传入搜索标题
     setCurrentEpisodeIndex,  // 传入切换集数的函数
   });
@@ -2597,7 +2636,7 @@ function PlayPageClient() {
     };
 
     initAll();
-  }, []);
+  }, [reloadTrigger]); // 添加 reloadTrigger 作为依赖，当它变化时重新执行 initAll
 
   // 播放记录处理
   useEffect(() => {
@@ -3061,6 +3100,7 @@ function PlayPageClient() {
         save_time: Date.now(),
         search_title: searchTitle,
         remarks: remarksToSave, // 优先使用搜索结果的 remarks，因为详情接口可能没有
+        douban_id: videoDoubanIdRef.current || detailRef.current?.douban_id || undefined, // 添加豆瓣ID
       });
 
       lastSaveTimeRef.current = Date.now();
@@ -6189,6 +6229,50 @@ function PlayPageClient() {
             >
               重新同步
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* 源切换确认对话框 */}
+      {showSourceSwitchDialog && pendingOwnerState && (
+        <div className='fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-9999'>
+          <div className='bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-sm mx-4 shadow-2xl'>
+            <div className='text-center'>
+              <div className='w-12 h-12 mx-auto mb-4 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center'>
+                <svg className='w-6 h-6 text-yellow-500' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                  <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z' />
+                </svg>
+              </div>
+              <h3 className='text-lg font-semibold text-gray-900 dark:text-white mb-2'>
+                播放源不同
+              </h3>
+              <p className='text-sm text-gray-500 dark:text-gray-400 mb-3'>
+                房主使用的播放源与您不同，是否切换到房主的播放源？
+              </p>
+              <p className='text-base font-medium text-gray-900 dark:text-white mb-1'>
+                房主播放源
+              </p>
+              <p className='text-sm text-blue-500 dark:text-blue-400 mb-3 font-mono'>
+                {pendingOwnerState.source}
+              </p>
+              <p className='text-xs text-orange-500 dark:text-orange-400 mb-6'>
+                ⚠️ 保持当前源将无法与房主同步进度
+              </p>
+              <div className='flex gap-3'>
+                <button
+                  onClick={handleCancelSourceSwitch}
+                  className='flex-1 px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors font-medium'
+                >
+                  保持当前源
+                </button>
+                <button
+                  onClick={handleConfirmSourceSwitch}
+                  className='flex-1 px-4 py-2.5 rounded-xl bg-blue-500 hover:bg-blue-600 text-white transition-colors font-medium'
+                >
+                  切换源
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
