@@ -1,4 +1,4 @@
-import { unstable_cache } from 'next/cache';
+import { cacheLife, cacheTag } from 'next/cache';
 import { NextResponse } from 'next/server';
 
 import { getCacheTime } from '@/lib/config';
@@ -158,18 +158,18 @@ async function _fetchMobileApiData(id: string): Promise<{
 }
 
 /**
- * 使用 unstable_cache 包裹移动端API请求
+ * 使用 "use cache" directive 包裹移动端API请求
  * - 30分钟缓存（trailer URL 有时效性，需要较短缓存）
  * - 与详情页缓存分开管理
+ * - 使用 cacheLife 和 cacheTag 进行精确控制
  */
-const fetchMobileApiData = unstable_cache(
-  _fetchMobileApiData,
-  ['douban-mobile-api'],
-  {
-    revalidate: 1800, // 30分钟缓存
-    tags: ['douban-mobile'],
-  }
-);
+async function fetchMobileApiData(id: string) {
+  'use cache';
+  cacheLife('short'); // 使用自定义的 short 配置（30分钟）
+  cacheTag('douban-mobile', `douban-mobile-${id}`); // 添加通用tag和ID特定tag
+
+  return _fetchMobileApiData(id);
+}
 
 // ============================================================================
 // 核心爬虫函数（带缓存）
@@ -302,18 +302,24 @@ async function _scrapeDoubanDetails(id: string, retryCount = 0): Promise<any> {
 }
 
 /**
- * 使用 unstable_cache 包裹爬虫函数
+ * 使用 "use cache" directive 包裹爬虫函数
  * - 4小时缓存
  * - 自动重新验证
+ * - 使用 cacheLife 和 cacheTag 进行精确控制
  */
-export const scrapeDoubanDetails = unstable_cache(
-  _scrapeDoubanDetails,
-  ['douban-details'],
-  {
-    revalidate: 14400, // 4小时缓存
-    tags: ['douban'],
-  }
-);
+async function scrapeDoubanDetails(id: string, retryCount = 0) {
+  'use cache';
+  cacheLife({
+    stale: 14400, // 4小时
+    revalidate: 14400, // 4小时后重新验证
+    expire: 28800, // 8小时后过期
+  });
+  cacheTag('douban', `douban-${id}`); // 添加通用tag和ID特定tag
+
+  return _scrapeDoubanDetails(id, retryCount);
+}
+
+export { scrapeDoubanDetails };
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -351,15 +357,18 @@ export async function GET(request: Request) {
     const cacheTime = await getCacheTime();
 
     // 🔍 调试模式：绕过缓存
+    // 🎬 Trailer安全缓存：30分钟（与移动端API的unstable_cache保持一致）
+    // 因为trailer URL有效期约2-3小时，30分钟缓存确保用户拿到的链接仍然有效
+    const trailerSafeCacheTime = 1800; // 30分钟
     const cacheHeaders = noCache ? {
       'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
       'Pragma': 'no-cache',
       'Expires': '0',
       'X-Data-Source': 'no-cache-debug',
     } : {
-      'Cache-Control': `public, max-age=${cacheTime}, s-maxage=86400, stale-while-revalidate=43200`,
-      'CDN-Cache-Control': `public, s-maxage=86400`,
-      'Vercel-CDN-Cache-Control': `public, s-maxage=86400`,
+      'Cache-Control': `public, max-age=${trailerSafeCacheTime}, s-maxage=${trailerSafeCacheTime}, stale-while-revalidate=${trailerSafeCacheTime}`,
+      'CDN-Cache-Control': `public, s-maxage=${trailerSafeCacheTime}`,
+      'Vercel-CDN-Cache-Control': `public, s-maxage=${trailerSafeCacheTime}`,
       'Netlify-Vary': 'query',
       'X-Data-Source': 'scraper-cached',
     };
