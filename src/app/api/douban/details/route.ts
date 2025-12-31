@@ -1,4 +1,4 @@
-import { cacheLife, cacheTag } from 'next/cache';
+import { unstable_cache } from 'next/cache';
 import { NextResponse } from 'next/server';
 
 import { getCacheTime } from '@/lib/config';
@@ -158,18 +158,19 @@ async function _fetchMobileApiData(id: string): Promise<{
 }
 
 /**
- * 使用 "use cache" directive 包裹移动端API请求
+ * 使用 unstable_cache 包裹移动端API请求
  * - 30分钟缓存（trailer URL 有时效性，需要较短缓存）
  * - 与详情页缓存分开管理
- * - 使用 cacheLife 和 cacheTag 进行精确控制
+ * - Next.js会自动根据函数参数区分缓存
  */
-async function fetchMobileApiData(id: string) {
-  'use cache';
-  cacheLife('short'); // 使用自定义的 short 配置（30分钟）
-  cacheTag('douban-mobile', `douban-mobile-${id}`); // 添加通用tag和ID特定tag
-
-  return _fetchMobileApiData(id);
-}
+const fetchMobileApiData = unstable_cache(
+  async (id: string) => _fetchMobileApiData(id),
+  ['douban-mobile-api'],
+  {
+    revalidate: 1800, // 30分钟缓存
+    tags: ['douban-mobile'],
+  }
+);
 
 // ============================================================================
 // 核心爬虫函数（带缓存）
@@ -302,24 +303,19 @@ async function _scrapeDoubanDetails(id: string, retryCount = 0): Promise<any> {
 }
 
 /**
- * 使用 "use cache" directive 包裹爬虫函数
+ * 使用 unstable_cache 包裹爬虫函数
  * - 4小时缓存
  * - 自动重新验证
- * - 使用 cacheLife 和 cacheTag 进行精确控制
+ * - Next.js会自动根据函数参数区分缓存
  */
-async function scrapeDoubanDetails(id: string, retryCount = 0) {
-  'use cache';
-  cacheLife({
-    stale: 14400, // 4小时
-    revalidate: 14400, // 4小时后重新验证
-    expire: 28800, // 8小时后过期
-  });
-  cacheTag('douban', `douban-${id}`); // 添加通用tag和ID特定tag
-
-  return _scrapeDoubanDetails(id, retryCount);
-}
-
-export { scrapeDoubanDetails };
+export const scrapeDoubanDetails = unstable_cache(
+  async (id: string, retryCount = 0) => _scrapeDoubanDetails(id, retryCount),
+  ['douban-details'],
+  {
+    revalidate: 14400, // 4小时缓存
+    tags: ['douban'],
+  }
+);
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
