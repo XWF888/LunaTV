@@ -12,6 +12,10 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
+  workflow_run:
+    workflows: ["Release by VERSION.txt"]
+    types:
+      - completed
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -174,7 +178,7 @@ jobs:
         id: lowercase
         run: echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
-      - name: Create manifest list 和 push
+      - name: Create manifest list and push
         working-directory: /tmp/digests
         run: |
           # Always create latest tag
@@ -203,6 +207,6 @@ jobs:
         uses: Mattraks/delete-workflow-runs@main
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          仓库: ${{ github.repository }}
+          repository: ${{ github.repository }}
           retain_days: 0
           keep_minimum_runs: 2
